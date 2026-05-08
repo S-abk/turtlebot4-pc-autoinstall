@@ -34,7 +34,7 @@ You'll also need:
 
 ```bash
 git clone https://github.com/S-abk/tb4-pc-autoinstall.git
-cd tb4-pc-autoinstall
+cd turtlebot4-pc-autoinstall
 
 # 1. Generate a password hash for your install user
 mkpasswd -m sha-512
