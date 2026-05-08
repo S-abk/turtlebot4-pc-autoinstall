@@ -33,7 +33,7 @@ You'll also need:
 ## Quick start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/tb4-pc-autoinstall.git
+git clone https://github.com/S-abk/tb4-pc-autoinstall.git
 cd tb4-pc-autoinstall
 
 # 1. Generate a password hash for your install user

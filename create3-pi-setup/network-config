@@ -1,7 +1,9 @@
-## This file controls the network configuration applied on first boot of
-## an Ubuntu Server image for the Raspberry Pi. After first boot, edits to
-## this file have no effect — to change network config later, edit
-## /etc/netplan/50-cloud-init.yaml instead.
+## Reference network-config — example of what prep-sd-card.sh produces.
+##
+## prep-sd-card.sh no longer copies this file directly; it does a YAML merge
+## of the existing network-config (whatever the Pi Imager wrote, including
+## Wi-Fi creds) with the usb0 entry below. This file is here as a reference
+## for what a fully-configured network-config looks like.
 ##
 ## Required for Create 3 connectivity: the usb0 entry sets a static IP on
 ## the USB-C link to the Create 3 robot. The Create 3 itself uses 192.168.186.2

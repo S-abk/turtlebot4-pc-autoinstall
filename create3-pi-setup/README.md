@@ -61,10 +61,12 @@ chmod +x prep-sd-card.sh
 ./prep-sd-card.sh
 ```
 
+**Order doesn't matter** — you can set Wi-Fi credentials in the Imager GUI before flashing, OR add them by editing the generated `network-config` afterward. The script does a YAML merge that preserves whatever the Imager wrote (Wi-Fi creds, hostname, etc.) and just adds the `usb0` static IP needed for the Create 3 link.
+
 The script:
 - Adds `dtoverlay=dwc2,dr_mode=peripheral` to `config.txt` (USB-C peripheral mode)
 - Adds `modules-load=dwc2,g_ether` to `cmdline.txt` (load USB-C ethernet modules at boot)
-- Replaces `network-config` with one that adds `usb0` static IP for the Create 3
+- **Merges** `network-config` — preserves Imager's Wi-Fi settings, adds `usb0` static IP
 - Appends our `pi-user-data` to the Imager's `user-data` so cloud-init runs the ROS install on first boot
 
 It auto-detects the SD card's mount point. If detection fails, pass it explicitly:
