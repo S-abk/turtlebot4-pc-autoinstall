@@ -1,0 +1,135 @@
+#cloud-config
+# Ubuntu 22.04 Server ISO autoinstall config that produces an Ubuntu Desktop
+# system with ROS 2 Humble + TurtleBot 4 packages preinstalled.
+#
+# IMPORTANT design notes:
+#
+# 1. We use the SERVER ISO, not Desktop. Only the Server ISO honors autoinstall
+#    directives. We install ubuntu-desktop on top during late-commands, which
+#    produces the same end result as a Desktop install.
+#
+# 2. The `packages:` list is INTENTIONALLY EMPTY. Subiquity processes the
+#    packages list against the install ISO's limited /cdrom apt sources
+#    (main + restricted only, just whatever's bundled on the ISO).
+#    `restore_apt_config` doesn't run until AFTER the packages step, so
+#    anything not on the cdrom fails to install with exit code 100.
+#    All package installs happen in `late-commands` instead, where the target
+#    system has its full network apt sources (universe enabled) in place.
+#
+# 3. `interactive-sections: []` is required. Without it, subiquity may default
+#    individual sections to "interactive" mode and drop into the UI even
+#    though everything else looks correct.
+#
+# 4. NO HEREDOCS in late-commands. YAML's parser misreads multi-line bash
+#    heredocs as new top-level keys. Use single-line printf instead.
+#
+# Before flashing:
+#   - replace identity.password hash with output of: mkpasswd -m sha-512
+#   - adjust hostname / timezone / locale / keyboard if needed
+#   - add ssh.authorized-keys for fleet management
+
+autoinstall:
+  version: 1
+
+  # Run every section non-interactively. Required.
+  interactive-sections: []
+
+  refresh-installer:
+    update: yes
+
+  locale: en_US.UTF-8
+
+  keyboard:
+    layout: us
+
+  identity:
+    hostname: tb4-pc
+    username: turtlebot
+    # Replace with output of: mkpasswd -m sha-512
+    password: "$6$REPLACE_ME_WITH_REAL_HASH$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+  ssh:
+    install-server: true
+    allow-pw: true
+    # authorized-keys:
+    #   - ssh-ed25519 AAAA... your-key-here
+
+  # Wipe disk, no LVM (simpler for a single-purpose desktop). Adjust if you
+  # need dual-boot or specific partitioning.
+  storage:
+    layout:
+      name: direct
+
+  timezone: America/New_York
+
+  # Disable geoip-based mirror lookup (it tends to time out and slow the
+  # install). Use archive.ubuntu.com directly.
+  apt:
+    geoip: false
+    preserve_sources_list: false
+    primary:
+      - arches: [amd64]
+        uri: http://archive.ubuntu.com/ubuntu
+
+  # Use the HWE kernel that Ubuntu Desktop normally uses.
+  early-commands:
+    - echo 'linux-generic-hwe-22.04' > /run/kernel-meta-package
+
+  # NOTE: empty by design. See top-of-file comment #2.
+  packages: []
+
+  updates: all
+
+  # late-commands run AFTER restore_apt_config, so the target has its full
+  # network apt sources at this point. Each command is a single shell line.
+  late-commands:
+    # Sanity check: log the actual apt sources being used. If something goes
+    # wrong, this output makes the cause obvious.
+    - curtin in-target --target=/target -- bash -c "echo '=== sources.list ===' && cat /etc/apt/sources.list"
+
+    # Belt-and-braces: ensure universe is enabled.
+    - curtin in-target --target=/target -- add-apt-repository -y universe
+
+    - curtin in-target --target=/target -- apt-get update
+
+    # Base utilities.
+    - curtin in-target --target=/target -- apt-get install -y openssh-server curl gnupg ca-certificates software-properties-common build-essential git vim net-tools
+
+    # Ubuntu Desktop (~1.5 GB of packages, 10-15 minutes on most networks).
+    - curtin in-target --target=/target -- apt-get install -y ubuntu-desktop
+
+    # On 22.04, Firefox ships as a snap (not an apt package). The ubuntu-desktop
+    # metapackage normally pulls it in, but during curtin-driven installs the
+    # snap step often gets skipped. Install explicitly here.
+    - curtin in-target --target=/target -- snap install firefox
+    - curtin in-target --target=/target -- snap install snap-store
+
+    # Add the ROS 2 apt key.
+    - curtin in-target --target=/target -- bash -c "curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg"
+
+    # Add the ROS 2 apt repository for jammy (Ubuntu 22.04).
+    - curtin in-target --target=/target -- bash -c "echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu jammy main' > /etc/apt/sources.list.d/ros2.list"
+
+    - curtin in-target --target=/target -- apt-get update
+
+    # ROS 2 Humble + TurtleBot 4 desktop metapackages.
+    - curtin in-target --target=/target -- apt-get install -y ros-humble-desktop ros-humble-turtlebot4-desktop python3-colcon-common-extensions python3-rosdep python3-argcomplete
+
+    # rosdep init (idempotent — || true so a second run doesn't abort).
+    - curtin in-target --target=/target -- bash -c "rosdep init || true"
+
+    # Append ROS env vars to user's bashrc. Per the TurtleBot 4 docs, Humble
+    # uses rmw_fastrtps_cpp. Single-line printf instead of heredoc to keep
+    # the YAML parser happy.
+    #
+    # ROS_DOMAIN_ID=0 here is a default. For paired PC<->robot deployments,
+    # change this per-PC to match the paired robot's ID (1-100).
+    # See README "Pairing PCs with robots" for the convention.
+    - curtin in-target --target=/target -- bash -c "printf '\n# ROS 2 Humble + TurtleBot 4\nsource /opt/ros/humble/setup.bash\nexport RMW_IMPLEMENTATION=rmw_fastrtps_cpp\nexport ROS_DOMAIN_ID=0\n' >> /home/turtlebot/.bashrc"
+
+    - curtin in-target --target=/target -- chown turtlebot:turtlebot /home/turtlebot/.bashrc
+
+    # rosdep update must run as the user, not root.
+    - curtin in-target --target=/target -- sudo -u turtlebot rosdep update
+
+  shutdown: reboot

@@ -1,0 +1,19 @@
+# Don't accidentally commit the ISO
+*.iso
+*.img
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor swap files
+*~
+*.swp
+*.swo
+
+# Personal user-data with real password hash
+# (uncomment if you want to commit a sanitized template only)
+# user-data.local
+
+# Build artifacts
+*.tmp

@@ -1,0 +1,76 @@
+#cloud-config
+# First-boot config for a Raspberry Pi 4 mounted on a Create 3 base.
+# Installs ROS 2 Humble + iRobot Create 3 message packages and configures
+# the ROS environment to use FastRTPS (matching the TurtleBot 4 user PCs).
+#
+# This file goes on the SD card's `system-boot` partition, alongside the
+# Ubuntu Pi image's own user-data. Cloud-init runs it on first boot.
+#
+# Pairs with these manual edits on the same partition (per iRobot guide):
+#   - config.txt:     append "dtoverlay=dwc2,dr_mode=peripheral"
+#   - cmdline.txt:    append "modules-load=dwc2,g_ether" after "rootwait"
+#   - network-config: add usb0 ethernet entry with static IP 192.168.186.3/24
+#
+# Before flashing:
+#   - The username below ('ubuntu') is the default the Pi imager uses.
+#     If you changed it in the Imager's "Edit Settings" GUI, change it here too.
+#   - Optionally set a unique hostname per robot (or do it post-boot).
+
+hostname: tb4-create3-pi
+manage_etc_hosts: true
+
+# Locale fix per iRobot guide step 11.
+locale: en_US.UTF-8
+
+# Use Ubuntu's NTP servers so the Pi's clock stays accurate. The Create 3
+# syncs its clock from the Pi over USB.
+ntp:
+  enabled: true
+  ntp_client: systemd-timesyncd
+  servers:
+    - ntp.ubuntu.com
+  pools:
+    - 0.us.pool.ntp.org
+    - 1.us.pool.ntp.org
+
+# Heavy lifting on first boot. runcmd runs once, after cloud-init's other
+# modules. Each line is a shell command — keep them single-line (no heredocs)
+# for the same YAML-parser reasons we hit on the PC side.
+runcmd:
+  # Make sure system is up to date and locale tools are present.
+  - locale-gen en_US.UTF-8
+  - update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+  - DEBIAN_FRONTEND=noninteractive apt-get update
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y curl gnupg2 lsb-release build-essential git cmake software-properties-common
+
+  # Add the ROS 2 apt repo for Ubuntu 22.04 (jammy) on arm64.
+  - curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+  - bash -c "echo 'deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu jammy main' > /etc/apt/sources.list.d/ros2.list"
+  - DEBIAN_FRONTEND=noninteractive apt-get update
+
+  # ROS 2 Humble base + iRobot Create 3 messages.
+  # NB: ros-humble-ros-base instead of ros-humble-desktop because we picked
+  # headless. ros-base gives you the CLI tools (ros2 topic etc) without GUI deps.
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y ros-humble-ros-base ros-humble-irobot-create-msgs python3-colcon-common-extensions python3-rosdep python3-argcomplete
+
+  # rosdep init (idempotent).
+  - bash -c "rosdep init || true"
+
+  # Append ROS env vars to the ubuntu user's bashrc. Single-line printf, no
+  # heredoc. RMW set to FastRTPS to match the user PCs.
+  #
+  # ROS_DOMAIN_ID=0 is a default. For paired PC<->robot deployments, change
+  # per-Pi (and per paired PC) so each pair has a unique ID (1-100).
+  # See README "Pairing convention".
+  - bash -c "printf '\n# ROS 2 Humble + Create 3\nsource /opt/ros/humble/setup.bash\nexport RMW_IMPLEMENTATION=rmw_fastrtps_cpp\nexport ROS_DOMAIN_ID=0\n' >> /home/ubuntu/.bashrc"
+  - chown ubuntu:ubuntu /home/ubuntu/.bashrc
+
+  # rosdep update as the user, not root.
+  - sudo -u ubuntu rosdep update
+
+  # Touch a marker file so we can verify cloud-init finished from outside.
+  - touch /home/ubuntu/.tb4-pi-setup-complete
+  - chown ubuntu:ubuntu /home/ubuntu/.tb4-pi-setup-complete
+
+# Don't reboot — first boot already takes a while; reboot at user discretion.
+final_message: "Create 3 Pi setup complete. Marker at ~/.tb4-pi-setup-complete. Reboot recommended."

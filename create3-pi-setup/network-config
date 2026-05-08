@@ -1,0 +1,36 @@
+## This file controls the network configuration applied on first boot of
+## an Ubuntu Server image for the Raspberry Pi. After first boot, edits to
+## this file have no effect — to change network config later, edit
+## /etc/netplan/50-cloud-init.yaml instead.
+##
+## Required for Create 3 connectivity: the usb0 entry sets a static IP on
+## the USB-C link to the Create 3 robot. The Create 3 itself uses 192.168.186.2
+## on its end. Don't change those addresses.
+##
+## Wi-Fi is optional. Uncomment and edit the wifis section, OR leave it
+## commented and use ethernet (or set Wi-Fi via the Imager's GUI before
+## you copy this file over — Imager's settings get baked into a sibling
+## file and our usb0 stanza gets merged in).
+
+version: 2
+
+ethernets:
+  eth0:
+    dhcp4: true
+    optional: true
+
+  # USB-C link to the Create 3 robot. DO NOT change the IP — Create 3
+  # expects 192.168.186.2 on its end and this Pi on .3.
+  usb0:
+    dhcp4: false
+    optional: true
+    addresses: [192.168.186.3/24]
+
+# Uncomment and edit if you want Wi-Fi configured at first boot.
+# wifis:
+#   wlan0:
+#     dhcp4: true
+#     optional: true
+#     access-points:
+#       "YOUR_SSID_HERE":
+#         password: "YOUR_PASSWORD_HERE"
