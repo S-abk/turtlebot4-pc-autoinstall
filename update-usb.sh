@@ -6,16 +6,16 @@
 # the 2 GB ISO contents.
 #
 # Usage:
-#   ./update-usb.sh /dev/sdX                  # default: hostname tb4-pc, ROS_DOMAIN_ID=0
-#   ./update-usb.sh /dev/sdX --pair 7         # tb4-pc-07, ROS_DOMAIN_ID=7
-#   ./update-usb.sh /dev/sdX --pair 7 --hostname-prefix tb4-pc
+#   ./update-usb.sh /dev/sdX                  # default: hostname turtlebot-pc, ROS_DOMAIN_ID=0
+#   ./update-usb.sh /dev/sdX --pair 7         # turtlebot-pc-07, ROS_DOMAIN_ID=7
+#   ./update-usb.sh /dev/sdX --pair 7 --hostname-prefix turtlebot-pc
 #
 # Flags:
 #   --pair N               Set hostname suffix and ROS_DOMAIN_ID to N.
 #                          N must be 1-100 (Create 3 webserver allows 0-101,
 #                          and we reserve 0 for testing/unpaired use).
 #                          Hostname becomes <prefix>-NN (zero-padded).
-#   --hostname-prefix STR  Override the hostname prefix (default: tb4-pc).
+#   --hostname-prefix STR  Override the hostname prefix (default: turtlebot-pc).
 #                          Useful if you have multiple labs/fleets.
 #
 # Without --pair, the user-data file is written as-is. With --pair, a
@@ -26,7 +26,7 @@ set -euo pipefail
 
 DEV=""
 PAIR=""
-HOSTNAME_PREFIX="tb4-pc"
+HOSTNAME_PREFIX="turtlebot-pc"
 
 # Parse args.
 while [[ $# -gt 0 ]]; do
@@ -99,7 +99,7 @@ if [[ -n "$PAIR" ]]; then
   cp ./user-data "$STAGED"
 
   # Replace the hostname line. We assume the template hostname is just the
-  # prefix (e.g. "tb4-pc") with no number; this matches our shipped user-data.
+  # prefix (e.g. "turtlebot-pc") with no number; this matches our shipped user-data.
   sed -i "s|^\(\s*hostname:\s*\).*$|\1${HOSTNAME_PREFIX}-${PAIR_PADDED}|" "$STAGED"
 
   # Replace the ROS_DOMAIN_ID. The export is inside a printf string in
@@ -132,7 +132,7 @@ if [[ -n "$PAIR" ]]; then
   echo "Pair $PAIR: hostname=${HOSTNAME_PREFIX}-${PAIR_PADDED}, ROS_DOMAIN_ID=${PAIR}"
 else
   USER_DATA_SRC="./user-data"
-  echo "No --pair specified; writing user-data as-is (defaults: hostname=tb4-pc, ROS_DOMAIN_ID=0)"
+  echo "No --pair specified; writing user-data as-is (defaults: hostname=turtlebot-pc, ROS_DOMAIN_ID=0)"
 fi
 
 sudo umount "$PART" 2>/dev/null || true
