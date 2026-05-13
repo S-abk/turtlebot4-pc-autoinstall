@@ -102,7 +102,7 @@ autoinstall:
     # metapackage normally pulls it in, but during curtin-driven installs the
     # snap step often gets skipped. Install explicitly here.
     - curtin in-target --target=/target -- snap install firefox
-    - curtin in-target --target=/target -- snap install snap-store
+    # - curtin in-target --target=/target -- snap install snap-store
 
     # Add the ROS 2 apt key.
     - curtin in-target --target=/target -- bash -c "curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg"
